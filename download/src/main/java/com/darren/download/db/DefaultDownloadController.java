@@ -20,7 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultDownloadController implements DownloadDBController {
 
     private static final String SQL_REPLACE_DOWNLOAD_INFO = String.format(
-        "REPLACE INTO %s (_id,supportRanges,forceInstall,createAt,url,path,size,progress,status) VALUES(?,?,?,?,?,?,?,?,?);",
+        "REPLACE INTO %s (_id,supportRanges,forceInstall,createAt,url,path,size,progress,status, md5) VALUES(?,?,?,?,?,?,?,?,?,?);",
             DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_INFO);
 
     private static final String SQL_REPLACE_DOWNLOAD_THREAD_INFO = String.format(
@@ -30,7 +30,7 @@ public class DefaultDownloadController implements DownloadDBController {
 
     private static final String[] DOWNLOAD_INFO_COLUMNS = new String[] {"_id", "supportRanges", "forceInstall",
             "createAt", "url", "path",
-            "size", "progress", "status"
+            "size", "progress", "status", "md5"
     };
 
     private static final String[] DOWNLOAD_THREAD_INFO_COLUMNS = new String[] {
@@ -65,7 +65,8 @@ public class DefaultDownloadController implements DownloadDBController {
                         downloadInfo.getTaskId(), downloadInfo.getSupportRanges(),
                         downloadInfo.getForceInstall(), downloadInfo.getCreateAt(),
                         downloadInfo.getUrl(), downloadInfo.getSavePath(),
-                        downloadInfo.getSize(), downloadInfo.getProgress(), downloadInfo.getStatus()
+                        downloadInfo.getSize(), downloadInfo.getProgress(),
+                        downloadInfo.getStatus(), downloadInfo.getFileMD5()
                 }
         );
 
@@ -131,6 +132,7 @@ public class DefaultDownloadController implements DownloadDBController {
         downloadInfo.setSize(cursor.getLong(6));
         downloadInfo.setProgress(cursor.getLong(7));
         downloadInfo.setStatus(cursor.getInt(8));
+        downloadInfo.setFileMD5(cursor.getString(9));
     }
 
     @Override

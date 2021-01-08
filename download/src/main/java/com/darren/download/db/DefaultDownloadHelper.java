@@ -15,7 +15,7 @@ public final class DefaultDownloadHelper extends SQLiteOpenHelper {
 
     private static final String SQL_CREATE_DOWNLOAD_TABLE = String.format(
             "CREATE TABLE IF NOT EXISTS %s (_id varchar(255) PRIMARY KEY NOT NULL, supportRanges integer NOT NULL, forceInstall integer NOT NULL, createAt long NOT NULL, url varchar(255) NOT NULL," +
-                    "path varchar(255) NOT NULL, size long NOT NULL, progress long NOT NULL, status integer NOT NULL);",
+                    "path varchar(255) NOT NULL, size long NOT NULL, progress long NOT NULL, status integer NOT NULL, md5 varchar(255) NOT NULL);",
             TABLE_NAME_DOWNLOAD_INFO
     );
 

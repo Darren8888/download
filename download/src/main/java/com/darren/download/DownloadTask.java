@@ -219,7 +219,10 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
                     downloadTaskListener.onSuccess(downloadInfo);
                 }
             } else {
-                LogUtils.logd("DownloadTask", "11 md5 err remove delete: " + downloadInfo.getSavePath());
+                LogUtils.logd("DownloadTask", "11 md5 err remove delete: " + downloadInfo.getSavePath()
+                        + ", md5: " + FileMd5.getFileMD5(file)
+                        + ", net md5: " + downloadInfo.getFileMD5()
+                );
                 downloadInfo.setStatus(DownloadStatus.STATUS_RETRY);
                 file.delete();
                 if (null != downloadTaskListener) {
