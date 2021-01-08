@@ -45,9 +45,11 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
             httpURLConnection.setReadTimeout(config.getReadTimeout());
             httpURLConnection.setRequestMethod(config.getMethod());
 
-//            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "runDownload getStart(): " + downloadThreadInfo.getStart()
-//                + ", getProgress(): " + downloadThreadInfo.getProgress()
-//            );
+            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "runDownload "
+                    + ", getUrl(): " + downloadThreadInfo.getUrl()
+                    + ", getStart(): " + downloadThreadInfo.getStart()
+                    + ", getProgress(): " + downloadThreadInfo.getProgress()
+            );
 
             long lastStart = downloadThreadInfo.getStart()+downloadThreadInfo.getProgress();
             if (0 != downloadInfo.getSupportRanges()) {
@@ -55,8 +57,6 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
             }
 
             final int responseCode = httpURLConnection.getResponseCode();
-
-//            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "DownloadThreadRunnable responseCode: " + responseCode);
 
             if (HttpURLConnection.HTTP_PARTIAL == responseCode
                 || HttpURLConnection.HTTP_OK == responseCode
@@ -91,17 +91,17 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
             }
         } catch (MalformedURLException e) {
             if (null != listener) {
-                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId(), new DownloadException(DownloadException.CODE_EXCEPTION_URL_NULL, e.getMessage()));
             }
             e.printStackTrace();
         } catch (ProtocolException e) {
             if (null != listener) {
-                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId(), new DownloadException(DownloadException.CODE_EXCEPTION_URL_NULL, e.getMessage()));
             }
             e.printStackTrace();
         } catch (IOException e) {
             if (null != listener) {
-                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId(), new DownloadException(DownloadException.CODE_EXCEPTION_IO_ERR, e.getMessage()));
             }
             e.printStackTrace();
         } finally {

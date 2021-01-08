@@ -63,6 +63,7 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
 
 //                    LogUtils.logd(DownloadTask.class.getSimpleName(), "url: " + downloadInfo.getUrl() + ", supportRanges: " + fileInfo.getAcceptRanges() + ", size: " + fileInfo.getLength());
                 } else {
+                    downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
                     if (null != downloadTaskListener) {
                         downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_FILE_NULL, "file error"));
                     }
@@ -70,12 +71,14 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
                 }
             } catch (ExecutionException e) {
                 e.printStackTrace();
+                downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
                 if (null != downloadTaskListener) {
                     downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_IO_ERR, e.getMessage()));
                 }
                 return DownloadStatus.STATUS_ERROR;
             } catch (InterruptedException e) {
                 e.printStackTrace();
+                downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
                 if (null != downloadTaskListener) {
                     downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_IO_ERR, e.getMessage()));
                 }
@@ -88,11 +91,35 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
         }
 
         if (0>=downloadInfo.getSize()) {
+            downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
             if (null != downloadTaskListener) {
                 downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_FILE_NULL, "file(" + downloadInfo.getUrl() + ") is null"));
             }
             throw new DownloadException(DownloadException.CODE_EXCEPTION_FILE_NULL, "file(" + downloadInfo.getUrl() + ") is null");
         } else {
+            File file = new File(downloadInfo.getSavePath());
+            boolean reset = false;
+            if (0<downloadInfo.getProgress() && (!file.exists())) {
+                reset = true;
+            }
+
+            if (file.length() < downloadInfo.getProgress()) {
+                LogUtils.logd("DownloadTask", "start delete file length: " + file.length()
+                        + ", path: " + downloadInfo.getSavePath()
+                        + ", progress: " + downloadInfo.getProgress()
+                );
+                file.delete();
+                reset = true;
+            }
+
+            if (reset) {
+                downloadInfo.setProgress(0);
+                Map<String, DownloadThreadInfo> map = downloadInfo.getDownloadThreadInfoList();
+                for (DownloadThreadInfo threadInfo : map.values()) {
+                    threadInfo.setProgress(0);
+                }
+            }
+
             download();
             return DownloadStatus.STATUS_DOWNLOADING;
         }
@@ -143,16 +170,11 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
 
     private boolean hasFileDownload(DownloadInfo downloadInfo) {
         File file1 = new File(downloadInfo.getSavePath());
-        if (file1.exists()) {
-            if (FileMd5.getFileMD5(file1).equals(downloadInfo.getFileMD5())) {
-                if (null != downloadTaskListener) {
-                    downloadTaskListener.onSuccess(downloadInfo);
-                }
-                return true;
-            } else if (file1.length() < downloadInfo.getProgress()) {
-                file1.exists();
-                downloadInfo.setProgress(0);
+        if (file1.exists() && (FileMd5.getFileMD5(file1).equals(downloadInfo.getFileMD5()))) {
+            if (null != downloadTaskListener) {
+                downloadTaskListener.onSuccess(downloadInfo);
             }
+            return true;
         }
 
         return false;
@@ -184,26 +206,45 @@ public class DownloadTask implements DownloadTaskInterface, DownloadThreadListen
 
     @Override
     public void onDownloadSuccess(String threadId) {
-        File file = new File(downloadInfo.getSavePath());
-        if (!FileMd5.getFileMD5(file).equals(downloadInfo.getFileMD5())) {
-            downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
+
+        LogUtils.logd(DownloadTask.class.getSimpleName(), "onDownloadSuccess"
+                + ", url: " + downloadInfo.getUrl()
+                + ", progress: " + downloadInfo.getProgress()
+                + ", length: " + downloadInfo.getSize());
+
+        if (downloadInfo.getProgress() == downloadInfo.getSize()) {
+            File file = new File(downloadInfo.getSavePath());
+            if ((FileMd5.getFileMD5(file).equals(downloadInfo.getFileMD5()))) {
+                if (null != downloadTaskListener) {
+                    downloadTaskListener.onSuccess(downloadInfo);
+                }
+            } else {
+                LogUtils.logd("DownloadTask", "11 md5 err remove delete: " + downloadInfo.getSavePath());
+                downloadInfo.setStatus(DownloadStatus.STATUS_RETRY);
+                file.delete();
+                if (null != downloadTaskListener) {
+                    downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_IO_ERR, "file has some wrong!"));
+                }
+            }
+        } else if (downloadInfo.getProgress() > downloadInfo.getSize()) {
+            downloadInfo.setStatus(DownloadStatus.STATUS_RETRY);
+            File file = new File(downloadInfo.getSavePath());
+            LogUtils.logd("DownloadTask", "22 remove delete: " + downloadInfo.getSavePath());
             file.delete();
             if (null != downloadTaskListener) {
                 downloadTaskListener.onFailed(downloadInfo, new DownloadException(DownloadException.CODE_EXCEPTION_IO_ERR, "file has some wrong!"));
             }
-        } else if (null != downloadTaskListener) {
-            downloadTaskListener.onSuccess(downloadInfo);
         }
     }
 
     @Override
-    public void onDownloadFailed(String threadId) {
+    public void onDownloadFailed(String threadId, DownloadException exception) {
         if (DownloadStatus.STATUS_COMPLETED != downloadInfo.getStatus()) {
             downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
         }
 
         if (null != downloadTaskListener) {
-            downloadTaskListener.onSuccess(downloadInfo);
+            downloadTaskListener.onFailed(downloadInfo, exception);
         }
     }
 }

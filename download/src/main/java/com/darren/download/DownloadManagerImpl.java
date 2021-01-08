@@ -5,6 +5,7 @@ import android.content.Context;
 import com.darren.download.db.DefaultDownloadController;
 import com.darren.download.db.DownloadDBController;
 import com.darren.download.exception.DownloadException;
+import com.darren.download.log.LogUtils;
 
 import java.io.File;
 import java.util.List;
@@ -78,7 +79,20 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
             public void run() {
                 downloadDBController = new DefaultDownloadController(context);
                 List<DownloadInfo> downloadInfoList = downloadDBController.getAllDownloading();
-                downloadConsumer.addList(downloadInfoList);
+
+                LogUtils.logd("DownloadManagerImpl", "initDbData size: " + downloadInfoList.size());
+                for (DownloadInfo downloadInfo : downloadInfoList) {
+                    LogUtils.logd("DownloadManagerImpl", "initDbData "
+                        + ", url: " + downloadInfo.getUrl()
+                        + ", status: " + downloadInfo.getStatus()
+                        + ", size: " + downloadInfo.getSize()
+                        + ", progress: " + downloadInfo.getProgress()
+                    );
+
+                    if (DownloadStatus.STATUS_COMPLETED != downloadInfo.getStatus()) {
+                        downloadConsumer.add(downloadInfo);
+                    }
+                }
 
                 if (null != initListener) {
                     isReady = true;
@@ -121,6 +135,9 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
 
         downloadInfo.setStatus(DownloadStatus.STATUS_REMOVE);
         downloadConsumer.pauseDownloadTask(downloadInfo);
+
+        LogUtils.logd("DownloadManagerImpl", "remove delete: " + downloadInfo.getSavePath());
+
         File file = new File(downloadInfo.getSavePath());
         if (file.exists()) {
             file.delete();
@@ -133,6 +150,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
     }
 
     private void stopAll() {
+        LogUtils.logd("DownloadManagerImpl", "stopAll");
         checkReady();
         downloadConsumer.stop();
     }
@@ -164,6 +182,13 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
 
     @Override
     public void onStop(DownloadInfo downloadInfo) {
+
+        LogUtils.logd("DownloadManagerImpl", "onStop url: " + downloadInfo.getUrl()
+                + ", size: " + downloadInfo.getSize()
+                + ", progress: " + downloadInfo.getProgress()
+                + ", status: " + downloadInfo.getStatus()
+        );
+
         downloadDBController.update(downloadInfo);
 
         if (null != initListener) {
@@ -184,7 +209,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
             initListener.onDownloadSuccess(downloadInfo);
         }
 
-        downloadDBController.delete(downloadInfo);
+        downloadDBController.update(downloadInfo);
     }
 
     @Override
@@ -192,5 +217,6 @@ public class DownloadManagerImpl implements DownloadManager, DownloadConsumer.Ca
         if (null != initListener) {
             initListener.onDownloadFailed(downloadInfo, exception);
         }
+        downloadDBController.update(downloadInfo);
     }
 }

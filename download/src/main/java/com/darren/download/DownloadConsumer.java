@@ -121,6 +121,13 @@ public class DownloadConsumer implements DownloadTaskListener, DownloadConsumerI
         for (DownloadTaskInterface taskInterface : downloadTaskMap.values()) {
             taskInterface.stop();
             DownloadInfo info = taskInterface.getDownloadInfo();
+
+            LogUtils.logd("DownloadConsumer", "11 stop url: " + info.getUrl()
+                    + ", size: " + info.getSize()
+                    + ", progress: " + info.getProgress()
+                    + ", status: " + info.getStatus()
+            );
+
             if (null != callback) {
                 callback.onStop(info);
             }
@@ -131,6 +138,13 @@ public class DownloadConsumer implements DownloadTaskListener, DownloadConsumerI
         }
 
         for (DownloadInfo info : blockingQueue) {
+
+            LogUtils.logd("DownloadConsumer", "22 stop url: " + info.getUrl()
+                    + ", size: " + info.getSize()
+                    + ", progress: " + info.getProgress()
+                    + ", status: " + info.getStatus()
+            );
+
             info.setStatus(DownloadStatus.STATUS_PAUSED);
             if (null != callback) {
                 callback.onStop(info);
@@ -166,10 +180,12 @@ public class DownloadConsumer implements DownloadTaskListener, DownloadConsumerI
 
     @Override
     public synchronized void onFailed(DownloadInfo downloadInfo, DownloadException exception) {
-        downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
         removeDownloadTask(downloadInfo);
         if (null != callback) {
             callback.onFailed(downloadInfo, exception);
+        }
+        if (DownloadStatus.STATUS_RETRY == downloadInfo.getStatus()) {
+            this.add(downloadInfo);
         }
     }
 }
