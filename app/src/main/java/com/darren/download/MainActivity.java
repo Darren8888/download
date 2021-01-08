@@ -28,6 +28,11 @@ public class MainActivity extends AppCompatActivity {
 
     private DownloadListener downloadListener = new DownloadListener() {
         @Override
+        public void onReady() {
+            testDownload();
+        }
+
+        @Override
         public void onStart(DownloadInfo downloadInfo) {
             LogUtils.logd(TAG, "onStart");
         }
@@ -57,6 +62,13 @@ public class MainActivity extends AppCompatActivity {
             LogUtils.logd(TAG, "onDownloadFailed " + e);
         }
     };
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+
+        mDownloadManager.destroy();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,12 +119,7 @@ public class MainActivity extends AppCompatActivity {
     private void inifDownloadManager() {
         if (null == mDownloadManager) {
             mDownloadManager = DownloadManagerImpl.getInstance();
-            mDownloadManager.init(this, null, downloadListener, new DownloadManagerImpl.InitListener() {
-                @Override
-                public void onReady() {
-                    testDownload();
-                }
-            });
+            mDownloadManager.init(this, null, downloadListener);
         }
     }
 
@@ -121,11 +128,15 @@ public class MainActivity extends AppCompatActivity {
         DownloadInfo downloadInfo = new DownloadInfo.Builder()
                 .setForceInstall(0)
                 .setSupportRanges(1)
+                .setPackageName("com.lemonread.student")
                 .setSavePath(path+ File.separator+"test.apk")
                 .setFileMD5("cc04964e1a47c4f1c48d62213d14f8fb")
+                .setUrl("http://apks.lemonread.com/student-guanwang-release-v242-build50-20181208-2016121544403285065.apk")
 //                .setUrl("http://........")
-                .setDownloadListener(downloadListener)
                 .build();
+
+        LogUtils.logd("MainActivity", "start download");
+
         mDownloadManager.start(downloadInfo);
     }
 

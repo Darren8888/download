@@ -8,9 +8,11 @@ import android.util.ArrayMap;
 import com.darren.download.DownloadInfo;
 import com.darren.download.DownloadStatus;
 import com.darren.download.DownloadThreadInfo;
+import com.darren.download.log.LogUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,9 +20,8 @@ import java.util.concurrent.ConcurrentHashMap;
 public class DefaultDownloadController implements DownloadDBController {
 
     private static final String SQL_REPLACE_DOWNLOAD_INFO = String.format(
-        "REPLACE INFO %s (_id, supportRanges, forceInstall, createAt, url, path, size, progress, status) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?);",
-            DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_INFO
-    );
+        "REPLACE INTO %s (_id,supportRanges,forceInstall,createAt,url,path,size,progress,status) VALUES(?,?,?,?,?,?,?,?,?);",
+            DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_INFO);
 
     private static final String SQL_REPLACE_DOWNLOAD_THREAD_INFO = String.format(
         "REPLACE INTO %s (threadId, downloadInfoId, url, start, end, progress) VALUES(?, ?, ?, ?, ?, ?);",
@@ -58,6 +59,11 @@ public class DefaultDownloadController implements DownloadDBController {
 
     @Override
     public synchronized void update(DownloadInfo downloadInfo) {
+        LogUtils.logd("DBController", "" + downloadInfo.getTaskId() + ", " + downloadInfo.getSupportRanges()
+            + ", " + downloadInfo.getForceInstall() + ", " + downloadInfo.getCreateAt()
+                + ", " + downloadInfo.getUrl() + ", " + downloadInfo.getSavePath()
+                + ", " + downloadInfo.getSize() + ", " + downloadInfo.getProgress() + ", " + downloadInfo.getStatus()
+        );
         writableDatabase.execSQL(
                 SQL_REPLACE_DOWNLOAD_INFO,
                 new Object[] {
@@ -67,6 +73,14 @@ public class DefaultDownloadController implements DownloadDBController {
                         downloadInfo.getSize(), downloadInfo.getProgress(), downloadInfo.getStatus()
                 }
         );
+
+        ConcurrentHashMap<String, DownloadThreadInfo> threadInfoMap = (ConcurrentHashMap)downloadInfo.getDownloadThreadInfoList();
+        Iterator entrys = threadInfoMap.entrySet().iterator();
+        while (entrys.hasNext()) {
+            Map.Entry entry = (Map.Entry) entrys.next();
+            DownloadThreadInfo downloadThreadInfo = (DownloadThreadInfo) entry.getValue();
+            update(downloadThreadInfo);
+        }
     }
 
     @Override
@@ -113,7 +127,7 @@ public class DefaultDownloadController implements DownloadDBController {
     }
 
     private void inflateDownloadInfo(Cursor cursor, DownloadInfo downloadInfo) {
-        downloadInfo.setTaskId(cursor.getInt(0));
+        downloadInfo.setTaskId(cursor.getString(0));
         downloadInfo.setSupportRanges(cursor.getInt(1));
         downloadInfo.setForceInstall(cursor.getInt(2));
         downloadInfo.setCreateAt(cursor.getLong(3));
@@ -125,19 +139,22 @@ public class DefaultDownloadController implements DownloadDBController {
     }
 
     @Override
-    public synchronized Map<Integer, DownloadInfo> getAllDownloading() {
+    public synchronized Map<String, DownloadInfo> getAllDownloading() {
         Cursor cursor = readableDatabase.query(DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_INFO,
                 DOWNLOAD_INFO_COLUMNS, "status != ?",
                 new String[] {String.valueOf(DownloadStatus.STATUS_COMPLETED)},
                 null, null, "createAt desc"
                 );
 
-        Map<Integer, DownloadInfo> downloadInfoList = new ConcurrentHashMap<>();
+        Map<String, DownloadInfo> downloadInfoList = new ConcurrentHashMap<>();
         Cursor downloadThreadinfoCursor;
         while (cursor.moveToNext()) {
+            LogUtils.logd("DbController", "getAllDownloading");
             DownloadInfo downloadInfo = new DownloadInfo();
             inflateDownloadInfo(cursor, downloadInfo);
             downloadInfoList.put(downloadInfo.getTaskId(), downloadInfo);
+
+            LogUtils.logd("DbController", "getAllDownloading id: " + downloadInfo.getTaskId());
 
             downloadThreadinfoCursor = readableDatabase.query(DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_THREAD_INFO,
                     DOWNLOAD_THREAD_INFO_COLUMNS, "downloadInfoId = ?",
@@ -149,6 +166,8 @@ public class DefaultDownloadController implements DownloadDBController {
                 DownloadThreadInfo threadInfo = new DownloadThreadInfo();
                 inflateDownloadThreadInfo(downloadThreadinfoCursor, threadInfo);
                 downloadInfo.addDownloadThreadInfo(threadInfo);
+
+                LogUtils.logd("DbController", "getAllDownloading threadInfo id: " + threadInfo.getThreadId());
             }
         }
 
@@ -157,7 +176,7 @@ public class DefaultDownloadController implements DownloadDBController {
 
     private void inflateDownloadThreadInfo(Cursor cursor, DownloadThreadInfo downloadThreadInfo) {
         downloadThreadInfo.setThreadId(cursor.getString(0));
-        downloadThreadInfo.setDownloadInfoId(cursor.getInt(1));
+        downloadThreadInfo.setDownloadInfoId(cursor.getString(1));
         downloadThreadInfo.setUrl(cursor.getString(2));
         downloadThreadInfo.setStart(cursor.getLong(3));
         downloadThreadInfo.setEnd(cursor.getLong(4));

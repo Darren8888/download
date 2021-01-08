@@ -6,13 +6,12 @@ import android.text.TextUtils;
 import com.darren.download.exception.DownloadException;
 import com.darren.download.log.LogUtils;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class DownloadInfo {
-    private int taskId;
+    private String packageName;
     private int supportRanges;
     private long createAt;
     private int forceInstall;
@@ -22,27 +21,19 @@ public final class DownloadInfo {
     private long progress;
     private String fileMD5;
     private int retryCount;
-    private int status;
+    private volatile int status;
 
     private Map<String, DownloadThreadInfo> downloadThreadInfoList;
-    private DownloadListener downloadListener;
 
     public DownloadInfo() {
         createAt = System.currentTimeMillis();
     }
 
-    public DownloadListener getDownloadListener() {
-        return this.downloadListener;
+    public String getTaskId() {
+        return this.packageName;
     }
-    public void setDownloadListener(DownloadListener listener) {
-        this.downloadListener = listener;
-    }
-
-    public int getTaskId() {
-        return this.taskId;
-    }
-    public void setTaskId(int taskId) {
-        this.taskId = taskId;
+    public void setTaskId(String packageName) {
+        this.packageName = packageName;
     }
 
     public int getSupportRanges() {
@@ -87,10 +78,10 @@ public final class DownloadInfo {
         this.size = size;
     }
 
-    public long getProgress() {
+    public synchronized long getProgress() {
         return this.progress;
     }
-    public void setProgress(long progress) {
+    public synchronized void setProgress(long progress) {
         this.progress = progress;
     }
 
@@ -108,19 +99,20 @@ public final class DownloadInfo {
         this.retryCount = retryCount;
     }
 
-    public int getStatus() {
+    public synchronized int getStatus() {
         return this.status;
     }
-    public void setStatus(int status) {
+    public synchronized void setStatus(int status) {
         this.status = status;
     }
 
     private void initDownloadThreadInfoList() {
         if (null == this.downloadThreadInfoList) {
-            this.downloadThreadInfoList = new HashMap<>();
+            this.downloadThreadInfoList = new ConcurrentHashMap<>();
         }
     }
     public Map<String, DownloadThreadInfo> getDownloadThreadInfoList() {
+        initDownloadThreadInfoList();
         return this.downloadThreadInfoList;
     }
     public void addDownloadThreadInfo(DownloadThreadInfo info) {
@@ -142,13 +134,13 @@ public final class DownloadInfo {
         }
 
         DownloadInfo downloadInfo = (DownloadInfo) obj;
-        return this.taskId == downloadInfo.getTaskId();
+        return this.packageName.equals(downloadInfo.getTaskId());
     }
 
-    @Override
-    public int hashCode() {
-        return this.taskId;
-    }
+//    @Override
+//    public int hashCode() {
+//        return this.taskId;
+//    }
 
     public static final class Builder {
         /*
@@ -159,10 +151,10 @@ public final class DownloadInfo {
          * 1为强制安装； 0为不强制安装
          */
         private int forceInstall = 0;
+        private String packageName;
         private String url;
         private String savePath;
         private String fileMD5;
-        private DownloadListener downloadListener;
 
         public Builder setSupportRanges(int supportRanges) {
             this.supportRanges = supportRanges;
@@ -189,8 +181,8 @@ public final class DownloadInfo {
             return this;
         }
 
-        public Builder setDownloadListener(DownloadListener listener) {
-            this.downloadListener = listener;
+        public Builder setPackageName(String packageName) {
+            this.packageName = packageName;
             return this;
         }
 
@@ -199,12 +191,18 @@ public final class DownloadInfo {
                 LogUtils.logd("DownloadInfo", "url can't be null");
                 throw new DownloadException(DownloadException.CODE_EXCEPTION_URL_NULL, "url can't be null");
             }
+
+            if (TextUtils.isEmpty(this.packageName)) {
+                LogUtils.logd("DownloadInfo", "packageName can't be null");
+                throw new DownloadException(DownloadException.CODE_EXCEPTION_INIT_FAILED, "packageName can't be null");
+            }
+
             DownloadInfo downloadInfo = new DownloadInfo();
 
             downloadInfo.setSupportRanges(this.supportRanges);
             downloadInfo.setForceInstall(this.forceInstall);
             downloadInfo.setUrl(this.url);
-            downloadInfo.setTaskId(this.url.hashCode());
+            downloadInfo.setTaskId(this.packageName);
 
             if (TextUtils.isEmpty(this.savePath)) {
                 downloadInfo.setSavePath(Environment.getDownloadCacheDirectory().getAbsolutePath());
@@ -213,7 +211,6 @@ public final class DownloadInfo {
             }
 
             downloadInfo.setFileMD5(this.fileMD5);
-            downloadInfo.setDownloadListener(this.downloadListener);
 
             return downloadInfo;
         }

@@ -14,5 +14,5 @@ public interface DownloadDBController {
     void delete(DownloadThreadInfo downloadTHreadInfo);
 
     DownloadInfo getDownloadInfoById(int id);
-    Map<Integer, DownloadInfo> getAllDownloading();
+    Map<String, DownloadInfo> getAllDownloading();
 }

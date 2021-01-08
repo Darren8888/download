@@ -3,6 +3,7 @@ package com.darren.download;
 import com.darren.download.exception.DownloadException;
 
 public interface DownloadListener {
+    void onReady();
     void onStart(DownloadInfo downloadInfo);
     void onPaused(DownloadInfo downloadInfo);
     void updateDownloadInfo(DownloadInfo downloadInfo);

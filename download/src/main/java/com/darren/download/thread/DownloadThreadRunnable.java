@@ -43,6 +43,10 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
             httpURLConnection.setReadTimeout(config.getReadTimeout());
             httpURLConnection.setRequestMethod(config.getMethod());
 
+            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "runDownload getStart(): " + downloadThreadInfo.getStart()
+                + ", getProgress(): " + downloadThreadInfo.getProgress()
+            );
+
             long lastStart = downloadThreadInfo.getStart()+downloadThreadInfo.getProgress();
             if (0 != downloadInfo.getSupportRanges()) {
                 httpURLConnection.setRequestProperty("Range", "bytes=" + lastStart + "-" + downloadThreadInfo.getEnd());

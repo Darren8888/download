@@ -2,7 +2,7 @@ package com.darren.download;
 
 public final class DownloadThreadInfo {
     private String threadId;
-    private int downloadInfoId;
+    private String downloadInfoId;
     private String url;
     private long start;
     private long end;
@@ -12,7 +12,7 @@ public final class DownloadThreadInfo {
 
     }
 
-    public DownloadThreadInfo(int downloadInfoId, String threadId, String url, long start, long end) {
+    public DownloadThreadInfo(String downloadInfoId, String threadId, String url, long start, long end) {
         this.downloadInfoId = downloadInfoId;
         this.threadId = threadId;
         this.url = url;
@@ -20,10 +20,10 @@ public final class DownloadThreadInfo {
         this.end = end;
     }
 
-    public int getDownloadInfoId() {
+    public String getDownloadInfoId() {
         return  this.downloadInfoId;
     }
-    public void setDownloadInfoId(int downloadInfoId) {
+    public void setDownloadInfoId(String downloadInfoId) {
         this.downloadInfoId = downloadInfoId;
     }
 

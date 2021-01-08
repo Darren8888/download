@@ -6,6 +6,7 @@ import android.util.Log;
 import com.darren.download.db.DefaultDownloadController;
 import com.darren.download.db.DownloadDBController;
 import com.darren.download.exception.DownloadException;
+import com.darren.download.file.FileMd5;
 import com.darren.download.log.LogUtils;
 import com.darren.download.thread.DownloadThreadListener;
 
@@ -25,17 +26,12 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
     private ExecutorService executorService;
     private Context context;
     private DownloadConfig config;
-    private ConcurrentHashMap<Integer, DownloadInfo> downloadInfoList;
+    private ConcurrentHashMap<String, DownloadInfo> downloadInfoList;
     private DownloadDBController downloadDBController;
     private ThreadFactory threadFactory;
-    private InitListener initListener;
-    private DownloadListener downloadListener;
-    private ConcurrentHashMap<Integer, DownloadTask> downloadTaskMap;
+    private DownloadListener initListener;
+    private ConcurrentHashMap<String, DownloadTaskInterface> downloadTaskMap;
     private boolean isReady = false;
-
-    public interface InitListener {
-        void onReady();
-    }
 
     private DownloadManagerImpl() {
 
@@ -54,7 +50,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
     }
 
     @Override
-    public void init(Context context, DownloadConfig config, DownloadListener downloadListener, InitListener listener) {
+    public void init(Context context, DownloadConfig config, DownloadListener listener) {
         this.context = context;
         if (null == config) {
             this.config = new DownloadConfig.Builder().build();
@@ -62,7 +58,6 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
             this.config = config;
         }
         this.initListener = listener;
-        this.downloadListener = downloadListener;
 
         threadFactory = new ThreadFactory() {
             private AtomicInteger atomicInteger = new AtomicInteger(0);
@@ -71,7 +66,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
                 return new Thread(r, "DownloadManagerImpl_"+atomicInteger.incrementAndGet());
             }
         };
-        executorService = Executors.newFixedThreadPool(this.config.getAllDownloadThreadNum(), threadFactory);
+        executorService = Executors.newFixedThreadPool(Integer.MAX_VALUE, threadFactory);
         downloadTaskMap = new ConcurrentHashMap<>();
         initDbData();
     }
@@ -81,11 +76,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
             @Override
             public void run() {
                 downloadDBController = new DefaultDownloadController(context);
-                downloadInfoList = (ConcurrentHashMap<Integer, DownloadInfo>) downloadDBController.getAllDownloading();
-
-                //TODO start download
-                prepareNextTask(true);
-
+                downloadInfoList = (ConcurrentHashMap<String, DownloadInfo>) downloadDBController.getAllDownloading();
                 if (null != initListener) {
                     isReady = true;
                     initListener.onReady();
@@ -101,6 +92,19 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
     }
 
     private boolean prepareDownload(DownloadInfo downloadInfo) {
+        LogUtils.logd("DownloadManagerImpl", "downloadInfo "
+                + ", " + downloadInfo.getTaskId()
+                + ", getStatus: " + downloadInfo.getStatus()
+                + ", getProgress: " + downloadInfo.getProgress()
+                + ", getUrl: " + downloadInfo.getUrl()
+                + ", info getFileMD5: " + downloadInfo.getFileMD5()
+                + ", downloadInfo getFileMD5: " + downloadInfo.getFileMD5()
+        );
+
+        if (downloadTaskMap.contains(downloadInfo.getTaskId())) {
+            return true;
+        }
+
         if (downloadTaskMap.size() >= config.getAllDownloadThreadNum()/config.getEachDownloadThreadNum()) {
             downloadInfo.setStatus(DownloadStatus.STATUS_WAIT);
             downloadInfoList.put(downloadInfo.getTaskId(), downloadInfo);
@@ -112,20 +116,35 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
                 file.getParentFile().mkdirs();
             }
 
-            DownloadTask task = new DownloadTask(executorService, downloadInfo, config, downloadListener, this);
+            DownloadTaskInterface task = new DownloadTask(executorService, downloadInfo, config, this);
             downloadTaskMap.put(downloadInfo.getTaskId(), task);
             downloadInfo.setStatus(DownloadStatus.STATUS_PREPARE_DOWNLOAD);
             downloadInfoList.put(downloadInfo.getTaskId(), downloadInfo);
-            task.start();
-            if (null != downloadListener) {
-                downloadListener.onStart(downloadInfo);
+            LogUtils.logd("DownloadManagerImpl", "add prepareDownload");
+            try {
+                int status = task.start();
+                if (DownloadStatus.STATUS_DOWNLOADING == status) {
+                    downloadInfo.setStatus(DownloadStatus.STATUS_DOWNLOADING);
+                    if (null != initListener) {
+                        initListener.onStart(downloadInfo);
+                    }
+                } else if (DownloadStatus.STATUS_ERROR == status) {
+                    downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
+                    return false;
+                }
+            } catch (DownloadException e) {
+                downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
+                if (null != initListener) {
+                    initListener.onDownloadFailed(downloadInfo, e);
+                }
             }
+
             return true;
         }
     }
 
-    private void removeDownloadTask(int taskId) {
-        DownloadTask task = downloadTaskMap.get(taskId);
+    private void removeDownloadTask(String taskId) {
+        DownloadTaskInterface task = downloadTaskMap.get(taskId);
         if (null != task) {
             task.stop();
         }
@@ -133,8 +152,8 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
     }
 
     private void prepareNextTask(boolean resume) {
-        Set<Integer> downloadInfoIdList = downloadInfoList.keySet();
-        for (Integer id : downloadInfoIdList) {
+        Set<String> downloadInfoIdList = downloadInfoList.keySet();
+        for (String id : downloadInfoIdList) {
             DownloadInfo downloadInfo = downloadInfoList.get(id);
             if (DownloadStatus.STATUS_WAIT == downloadInfo.getStatus()
                 || ((resume) && (DownloadStatus.STATUS_PAUSED == downloadInfo.getStatus()))
@@ -146,8 +165,15 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
 
     @Override
     public void start(DownloadInfo downloadInfo) {
+        LogUtils.logd("DownloadManagerImpl", "start " + downloadInfo.getUrl()
+                + ", " + downloadInfo.getProgress()
+                + ", " + downloadInfo.getSavePath());
         checkReady();
-        prepareDownload(downloadInfo);
+
+//        if (!downloadTaskMap.contains(downloadInfo.getTaskId())) {
+            LogUtils.logd("DownloadManagerImpl", "start add prepareDownload task" + downloadInfo.getTaskId());
+            prepareDownload(downloadInfo);
+//        }
     }
 
     @Override
@@ -160,9 +186,10 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
                 && DownloadStatus.STATUS_REMOVE != downloadInfo.getStatus()
             ) {
                 downloadInfo.setStatus(DownloadStatus.STATUS_PAUSED);
-                if (null != downloadListener) {
-                    downloadListener.onPaused(downloadInfo);
+                if (null != initListener) {
+                    initListener.onPaused(downloadInfo);
                 }
+                downloadDBController.update(downloadInfo);
             }
             prepareNextTask(false);
         }
@@ -174,6 +201,7 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
 
         removeDownloadTask(downloadInfo.getTaskId());
         prepareDownload(downloadInfo);
+        downloadDBController.update(downloadInfo);
     }
 
     @Override
@@ -189,23 +217,25 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
         if (file.exists()) {
             file.delete();
         }
-        if (null != downloadListener) {
-            downloadListener.onRemoved(downloadInfo);
+        if (null != initListener) {
+            initListener.onRemoved(downloadInfo);
         }
     }
 
     private void stopAll() {
         checkReady();
 
-        Iterator entrys = downloadTaskMap.entrySet().iterator();
+        Iterator entrys = downloadInfoList.entrySet().iterator();
         while (entrys.hasNext()) {
             Map.Entry entry = (Map.Entry) entrys.next();
             DownloadInfo downloadInfo = (DownloadInfo) entry.getValue();
             removeDownloadTask(downloadInfo.getTaskId());
             downloadInfo.setStatus(DownloadStatus.STATUS_PAUSED);
-            if (null != downloadListener) {
-                downloadListener.onPaused(downloadInfo);
+            if (null != initListener) {
+                initListener.onPaused(downloadInfo);
             }
+
+            downloadDBController.update(downloadInfo);
         }
     }
 
@@ -227,27 +257,41 @@ public class DownloadManagerImpl implements DownloadManager, DownloadTaskListene
     }
 
     @Override
-    public void onSuccess(DownloadInfo downloadInfo) {
-        if (null != downloadListener) {
-            downloadListener.onDownloadSuccess(downloadInfo);
+    public void onUpdateProgress(DownloadInfo downloadInfo) {
+//        downloadDBController.update(downloadInfo);
+        if (null != initListener) {
+            initListener.updateDownloadInfo(downloadInfo);
+        }
+    }
+
+    @Override
+    public synchronized void onSuccess(DownloadInfo downloadInfo) {
+        downloadInfo.setStatus(DownloadStatus.STATUS_COMPLETED);
+
+        if (null != initListener) {
+            initListener.onDownloadSuccess(downloadInfo);
         }
 
-        if (null != downloadTaskMap && downloadTaskMap.contains(downloadInfo.getTaskId())) {
-            downloadTaskMap.remove(downloadInfo);
-        }
+        downloadDBController.delete(downloadInfo);
 
-        if (null != downloadInfoList && downloadInfoList.containsKey(downloadInfo.getTaskId())) {
-            downloadInfoList.remove(downloadInfo.getTaskId());
-        }
+        removeDownloadTask(downloadInfo.getTaskId());
+
+//        if (null != downloadInfoList && downloadInfoList.containsKey(downloadInfo.getTaskId())) {
+//            downloadInfoList.remove(downloadInfo.getTaskId());
+//        }
         prepareNextTask(true);
     }
 
     @Override
-    public void onFailed(DownloadInfo downloadInfo, DownloadException exception) {
-        if (null != downloadListener) {
-            downloadListener.onDownloadFailed(downloadInfo, exception);
+    public synchronized void onFailed(DownloadInfo downloadInfo, DownloadException exception) {
+        if (null != initListener) {
+            initListener.onDownloadFailed(downloadInfo, exception);
         }
+
+        removeDownloadTask(downloadInfo.getTaskId());
+
         downloadInfo.setStatus(DownloadStatus.STATUS_ERROR);
+        downloadDBController.update(downloadInfo);
         prepareNextTask(true);
     }
 

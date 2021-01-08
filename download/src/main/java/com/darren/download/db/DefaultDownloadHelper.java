@@ -14,13 +14,13 @@ public final class DefaultDownloadHelper extends SQLiteOpenHelper {
     public static final String TABLE_NAME_DOWNLOAD_THREAD_INFO = "download_thread_info";
 
     private static final String SQL_CREATE_DOWNLOAD_TABLE = String.format(
-            "CREATE TABLE IF NOT EXISTS %s (_id integer PRIMARY KEY NOT NULL, supportRanges integer NOT NULL, forceInstall integer NOT NULL, createAt long NOT NULL, url varchar(255) NOT NULL," +
+            "CREATE TABLE IF NOT EXISTS %s (_id varchar(255) PRIMARY KEY NOT NULL, supportRanges integer NOT NULL, forceInstall integer NOT NULL, createAt long NOT NULL, url varchar(255) NOT NULL," +
                     "path varchar(255) NOT NULL, size long NOT NULL, progress long NOT NULL, status integer NOT NULL);",
             TABLE_NAME_DOWNLOAD_INFO
     );
 
     private static final String SQL_CREATE_DOWNLOAD_THREAD_TABLE = String.format(
-            "CREATE TABLE IF NOT EXISTS %s (threadId varchar(255) PRIMARY KEY NOT NULL, downloadInfoId integer NOT NULL," +
+            "CREATE TABLE IF NOT EXISTS %s (threadId varchar(255) PRIMARY KEY NOT NULL, downloadInfoId varchar(255) NOT NULL," +
                     "url varchar(255) NOT NULL, start long NOT NULL, end long NOT NULL, progress long NOT NULL);",
             TABLE_NAME_DOWNLOAD_THREAD_INFO
     );
