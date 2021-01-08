@@ -59,11 +59,6 @@ public class DefaultDownloadController implements DownloadDBController {
 
     @Override
     public synchronized void update(DownloadInfo downloadInfo) {
-        LogUtils.logd("DBController", "" + downloadInfo.getTaskId() + ", " + downloadInfo.getSupportRanges()
-            + ", " + downloadInfo.getForceInstall() + ", " + downloadInfo.getCreateAt()
-                + ", " + downloadInfo.getUrl() + ", " + downloadInfo.getSavePath()
-                + ", " + downloadInfo.getSize() + ", " + downloadInfo.getProgress() + ", " + downloadInfo.getStatus()
-        );
         writableDatabase.execSQL(
                 SQL_REPLACE_DOWNLOAD_INFO,
                 new Object[] {
@@ -139,22 +134,19 @@ public class DefaultDownloadController implements DownloadDBController {
     }
 
     @Override
-    public synchronized Map<String, DownloadInfo> getAllDownloading() {
+    public synchronized List<DownloadInfo> getAllDownloading() {
         Cursor cursor = readableDatabase.query(DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_INFO,
                 DOWNLOAD_INFO_COLUMNS, "status != ?",
                 new String[] {String.valueOf(DownloadStatus.STATUS_COMPLETED)},
                 null, null, "createAt desc"
                 );
 
-        Map<String, DownloadInfo> downloadInfoList = new ConcurrentHashMap<>();
+        List<DownloadInfo> downloadInfoList = new ArrayList<>();
         Cursor downloadThreadinfoCursor;
         while (cursor.moveToNext()) {
-            LogUtils.logd("DbController", "getAllDownloading");
             DownloadInfo downloadInfo = new DownloadInfo();
             inflateDownloadInfo(cursor, downloadInfo);
-            downloadInfoList.put(downloadInfo.getTaskId(), downloadInfo);
-
-            LogUtils.logd("DbController", "getAllDownloading id: " + downloadInfo.getTaskId());
+            downloadInfoList.add(downloadInfo);
 
             downloadThreadinfoCursor = readableDatabase.query(DefaultDownloadHelper.TABLE_NAME_DOWNLOAD_THREAD_INFO,
                     DOWNLOAD_THREAD_INFO_COLUMNS, "downloadInfoId = ?",
@@ -166,8 +158,6 @@ public class DefaultDownloadController implements DownloadDBController {
                 DownloadThreadInfo threadInfo = new DownloadThreadInfo();
                 inflateDownloadThreadInfo(downloadThreadinfoCursor, threadInfo);
                 downloadInfo.addDownloadThreadInfo(threadInfo);
-
-                LogUtils.logd("DbController", "getAllDownloading threadInfo id: " + threadInfo.getThreadId());
             }
         }
 

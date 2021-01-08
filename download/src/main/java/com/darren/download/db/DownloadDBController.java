@@ -3,6 +3,7 @@ package com.darren.download.db;
 import com.darren.download.DownloadInfo;
 import com.darren.download.DownloadThreadInfo;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,5 +15,5 @@ public interface DownloadDBController {
     void delete(DownloadThreadInfo downloadTHreadInfo);
 
     DownloadInfo getDownloadInfoById(int id);
-    Map<String, DownloadInfo> getAllDownloading();
+    List<DownloadInfo> getAllDownloading();
 }

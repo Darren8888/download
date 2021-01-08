@@ -34,17 +34,17 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onStart(DownloadInfo downloadInfo) {
-            LogUtils.logd(TAG, "onStart");
+//            LogUtils.logd(TAG, "onStart");
         }
 
         @Override
         public void onPaused(DownloadInfo downloadInfo) {
-            LogUtils.logd(TAG, "onPaused");
+//            LogUtils.logd(TAG, "onPaused");
         }
 
         @Override
         public void updateDownloadInfo(DownloadInfo downloadInfo) {
-            LogUtils.logd(TAG, "size: " + downloadInfo.getSize() + ", progress: " + downloadInfo.getProgress());
+//            LogUtils.logd(TAG, "size: " + downloadInfo.getSize() + ", progress: " + downloadInfo.getProgress());
         }
 
         @Override
@@ -54,12 +54,12 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onDownloadSuccess(DownloadInfo downloadInfo) {
-            LogUtils.logd(TAG, "onDownloadSuccess " + downloadInfo.getUrl() + ", " + downloadInfo.getSavePath());
+//            LogUtils.logd(TAG, "onDownloadSuccess " + downloadInfo.getUrl() + ", " + downloadInfo.getSavePath());
         }
 
         @Override
         public void onDownloadFailed(DownloadInfo downloadInfo, DownloadException e) {
-            LogUtils.logd(TAG, "onDownloadFailed " + e);
+//            LogUtils.logd(TAG, "onDownloadFailed " + e);
         }
     };
 
@@ -130,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
                 .setSupportRanges(1)
                 .setPackageName("com.lemonread.student")
                 .setSavePath(path+ File.separator+"test.apk")
-                .setFileMD5("cc04964e1a47c4f1c48d62213d14f8fb")
+                .setFileMD5("c9e2af9d16eb6af6c7862a7670400b23")
                 .setUrl("http://apks.lemonread.com/student-guanwang-release-v242-build50-20181208-2016121544403285065.apk")
 //                .setUrl("http://........")
                 .build();

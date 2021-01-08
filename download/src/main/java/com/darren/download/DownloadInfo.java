@@ -22,11 +22,20 @@ public final class DownloadInfo {
     private String fileMD5;
     private int retryCount;
     private volatile int status;
+    private long updateTime;
 
     private Map<String, DownloadThreadInfo> downloadThreadInfoList;
 
     public DownloadInfo() {
         createAt = System.currentTimeMillis();
+        updateTime = createAt;
+    }
+
+    public long getUpdateTime() {
+        return this.updateTime;
+    }
+    public void setUpdateTime(long updateTime) {
+        this.updateTime = updateTime;
     }
 
     public String getTaskId() {

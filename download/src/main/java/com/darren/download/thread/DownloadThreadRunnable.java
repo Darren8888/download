@@ -4,7 +4,9 @@ import android.util.Log;
 
 import com.darren.download.DownloadConfig;
 import com.darren.download.DownloadInfo;
+import com.darren.download.DownloadStatus;
 import com.darren.download.DownloadThreadInfo;
+import com.darren.download.exception.DownloadException;
 import com.darren.download.log.LogUtils;
 
 import java.io.IOException;
@@ -43,9 +45,9 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
             httpURLConnection.setReadTimeout(config.getReadTimeout());
             httpURLConnection.setRequestMethod(config.getMethod());
 
-            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "runDownload getStart(): " + downloadThreadInfo.getStart()
-                + ", getProgress(): " + downloadThreadInfo.getProgress()
-            );
+//            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "runDownload getStart(): " + downloadThreadInfo.getStart()
+//                + ", getProgress(): " + downloadThreadInfo.getProgress()
+//            );
 
             long lastStart = downloadThreadInfo.getStart()+downloadThreadInfo.getProgress();
             if (0 != downloadInfo.getSupportRanges()) {
@@ -54,7 +56,7 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
 
             final int responseCode = httpURLConnection.getResponseCode();
 
-            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "DownloadThreadRunnable responseCode: " + responseCode);
+//            LogUtils.logd(DownloadThreadRunnable.class.getSimpleName(), "DownloadThreadRunnable responseCode: " + responseCode);
 
             if (HttpURLConnection.HTTP_PARTIAL == responseCode
                 || HttpURLConnection.HTTP_OK == responseCode
@@ -75,20 +77,32 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
                     offset += length;
                     downloadThreadInfo.setProgress(lastStart+offset-downloadThreadInfo.getStart());
 
-                    synchronized (listener) {
+                    if (null != listener) {
                         listener.onProgress(downloadThreadInfo.getThreadId(), downloadThreadInfo.getProgress());
                     }
                 }
 
                 inputStream.close();
                 file.close();
-                listener.onDownloadSuccess(downloadThreadInfo.getThreadId());
+
+                if (null != listener) {
+                    listener.onDownloadSuccess(downloadThreadInfo.getThreadId());
+                }
             }
         } catch (MalformedURLException e) {
+            if (null != listener) {
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+            }
             e.printStackTrace();
         } catch (ProtocolException e) {
+            if (null != listener) {
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+            }
             e.printStackTrace();
         } catch (IOException e) {
+            if (null != listener) {
+                listener.onDownloadFailed(downloadThreadInfo.getThreadId());
+            }
             e.printStackTrace();
         } finally {
             if (null != httpURLConnection) {
@@ -98,8 +112,8 @@ public class DownloadThreadRunnable extends ThreadTask<Object> {
     }
 
     private void hasPause() {
-//        if (downloadInfo.isPause()) {
-//            throw new DownloadException(DownloadException.CODE_EXCEPTION_PAUSE, "thread: " + downloadThreadInfo.getThreadId() + " has paused");
-//        }
+        if (downloadInfo.isPause()) {
+            throw new DownloadException(DownloadException.CODE_EXCEPTION_PAUSE, "thread: " + downloadThreadInfo.getThreadId() + " has paused");
+        }
     }
 }
